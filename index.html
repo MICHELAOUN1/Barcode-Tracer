@@ -18,7 +18,6 @@ body{font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:#e8e8f0;min
 <body>
 <div style="width:100%;max-width:440px;">
 
-  <!-- Header -->
   <div style="text-align:center;margin-bottom:24px;">
     <div style="background:#8B1C2C;border-radius:10px;padding:8px 14px;display:inline-flex;align-items:center;gap:8px;margin-bottom:16px;">
       <svg width="24" height="16" viewBox="0 0 24 16" fill="none">
@@ -34,36 +33,31 @@ body{font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:#e8e8f0;min
     <div id="branch-label" style="font-size:12px;color:#5a5a7a;font-family:monospace;"></div>
   </div>
 
-  <!-- Status -->
   <div id="status-box" style="border-radius:14px;background:rgba(255,255,255,.03);border:1px solid #252535;padding:12px 16px;display:flex;align-items:center;gap:12px;min-height:50px;margin-bottom:16px;transition:all .2s;">
     <span id="status-icon" style="font-size:18px;color:#5a5a7a;">▐</span>
     <span id="status-msg" style="font-size:14px;font-weight:600;color:#5a5a7a;">Ready to scan</span>
   </div>
 
-  <!-- Camera -->
   <div id="qr-reader" style="margin-bottom:16px;"></div>
 
-  <!-- Result -->
   <div id="last-scan" style="display:none;background:#1a1a26;border:1px solid #252535;border-radius:14px;padding:14px 16px;margin-bottom:16px;">
     <div style="font-size:10px;color:#5a5a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Last Scan</div>
     <div id="last-product" style="font-size:15px;font-weight:700;color:#e8e8f0;margin-bottom:4px;"></div>
     <div id="last-barcode" style="font-size:11px;color:#5a5a7a;font-family:monospace;"></div>
   </div>
 
-  <!-- Recent -->
   <div id="recent-container" style="display:none;">
     <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;color:#5a5a7a;text-transform:uppercase;margin-bottom:10px;">Recent Scans</div>
     <div id="recent-list" style="background:#12121a;border-radius:14px;overflow:hidden;border:1px solid #252535;"></div>
   </div>
 
-  <!-- Scan count -->
   <div style="text-align:center;margin-top:16px;">
     <span style="font-size:12px;color:#3a3a55;font-family:monospace;">Session: <strong id="scan-count" style="color:#e8e8f0;">0</strong> scans</span>
+    <div id="sync-status" style="font-size:11px;color:#3a3a55;margin-top:4px;"></div>
   </div>
 </div>
 
 <script>
-// Get params from URL
 var params = new URLSearchParams(window.location.search);
 var SCRIPT_URL = params.get("url") || "";
 var branch = params.get("branch") || "";
@@ -72,7 +66,6 @@ if(branch) document.getElementById("branch-label").textContent = branch.toUpperC
 
 var pm = [], scans = [], count = 0, stimer = null;
 
-// Load products
 if(SCRIPT_URL) {
   fetch(SCRIPT_URL+"?mode=products")
     .then(function(r){return r.json();})
@@ -83,12 +76,23 @@ if(SCRIPT_URL) {
 function lookup(b){return pm.find(function(p){return p.barcode===b.trim();})||null;}
 
 function postScan(s){
-  if(!SCRIPT_URL) return Promise.resolve(false);
-  return fetch(SCRIPT_URL,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(s)
-  }).then(function(r){return r.json();}).then(function(d){return d.success;}).catch(function(){return false;});
+  if(!SCRIPT_URL) return;
+  // Use no-cors to avoid CORS issues with Apps Script
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(s)
+  }).then(function(){
+    document.getElementById("sync-status").textContent = "✓ Synced";
+    document.getElementById("sync-status").style.color = "#00d084";
+    setTimeout(function(){
+      document.getElementById("sync-status").textContent = "";
+    }, 2000);
+  }).catch(function(){
+    document.getElementById("sync-status").textContent = "⚠ Sync failed";
+    document.getElementById("sync-status").style.color = "#f5a623";
+  });
 }
 
 function setStatus(t, msg){
@@ -116,16 +120,25 @@ function setStatus(t, msg){
   if(t!=="idle") stimer = setTimeout(function(){setStatus("idle","Ready to scan");},3500);
 }
 
+var lastScanned = "";
+var lastScannedTime = 0;
+
 function doScan(val){
   if(!val||!val.trim()) return;
+  // Prevent duplicate scans within 2 seconds
+  var now = Date.now();
+  if(val === lastScanned && now - lastScannedTime < 2000) return;
+  lastScanned = val;
+  lastScannedTime = now;
+
   var p = lookup(val);
   var s = {
-    id:Date.now()+"",
-    branch:branch,
-    barcode:val.trim(),
-    productName:p?p.name:"Unknown Product",
-    timestamp:new Date().toISOString(),
-    found:!!p
+    id: now+"",
+    branch: branch,
+    barcode: val.trim(),
+    productName: p?p.name:"Unknown Product",
+    timestamp: new Date().toISOString(),
+    found: !!p
   };
 
   scans = [s].concat(scans.slice(0,49));
@@ -134,7 +147,6 @@ function doScan(val){
 
   setStatus(p?"ok":"warn", p?p.name:"Not in master list");
 
-  // Last scan
   var ls = document.getElementById("last-scan");
   ls.style.display="block";
   ls.style.borderColor = p?"rgba(0,208,132,.3)":"rgba(245,166,35,.3)";
@@ -142,7 +154,6 @@ function doScan(val){
   document.getElementById("last-product").style.color = p?"#00d084":"#f5a623";
   document.getElementById("last-barcode").textContent = s.barcode;
 
-  // Recent list
   document.getElementById("recent-container").style.display="block";
   var html = scans.map(function(sc,i){
     return '<div class="'+(i===0?"fade":"")+'" style="padding:10px 14px;border-bottom:'+(i<scans.length-1?"1px solid #252535":"none")+';background:'+(i===0?"#1a1a26":"#12121a")+'">'
@@ -161,7 +172,6 @@ function doScan(val){
   postScan(s);
 }
 
-// Start camera
 var html5QrCode = new Html5Qrcode("qr-reader");
 html5QrCode.start(
   {facingMode:"environment"},
