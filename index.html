@@ -17,7 +17,6 @@ body{font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:#e8e8f0;min
 </head>
 <body>
 <div style="width:100%;max-width:440px;">
-
   <div style="text-align:center;margin-bottom:24px;">
     <div style="background:#8B1C2C;border-radius:10px;padding:8px 14px;display:inline-flex;align-items:center;gap:8px;margin-bottom:16px;">
       <svg width="24" height="16" viewBox="0 0 24 16" fill="none">
@@ -77,18 +76,16 @@ function lookup(b){return pm.find(function(p){return p.barcode===b.trim();})||nu
 
 function postScan(s){
   if(!SCRIPT_URL) return;
-  // Use no-cors to avoid CORS issues with Apps Script
+  var form = new FormData();
+  form.append("data", JSON.stringify(s));
   fetch(SCRIPT_URL, {
     method: "POST",
     mode: "no-cors",
-    headers: {"Content-Type":"application/json"},
-    body: JSON.stringify(s)
+    body: form
   }).then(function(){
     document.getElementById("sync-status").textContent = "✓ Synced";
     document.getElementById("sync-status").style.color = "#00d084";
-    setTimeout(function(){
-      document.getElementById("sync-status").textContent = "";
-    }, 2000);
+    setTimeout(function(){document.getElementById("sync-status").textContent="";}, 2000);
   }).catch(function(){
     document.getElementById("sync-status").textContent = "⚠ Sync failed";
     document.getElementById("sync-status").style.color = "#f5a623";
@@ -96,66 +93,49 @@ function postScan(s){
 }
 
 function setStatus(t, msg){
-  var box = document.getElementById("status-box");
-  var icon = document.getElementById("status-icon");
-  var msgEl = document.getElementById("status-msg");
+  var box=document.getElementById("status-box");
+  var icon=document.getElementById("status-icon");
+  var msgEl=document.getElementById("status-msg");
   if(t==="ok"){
-    box.style.background="rgba(0,208,132,.08)";
-    box.style.borderColor="rgba(0,208,132,.3)";
-    icon.style.color="#00d084"; icon.textContent="✓";
-    msgEl.style.color="#00d084";
+    box.style.background="rgba(0,208,132,.08)";box.style.borderColor="rgba(0,208,132,.3)";
+    icon.style.color="#00d084";icon.textContent="✓";msgEl.style.color="#00d084";
   } else if(t==="warn"){
-    box.style.background="rgba(245,166,35,.08)";
-    box.style.borderColor="rgba(245,166,35,.3)";
-    icon.style.color="#f5a623"; icon.textContent="⚠";
-    msgEl.style.color="#f5a623";
+    box.style.background="rgba(245,166,35,.08)";box.style.borderColor="rgba(245,166,35,.3)";
+    icon.style.color="#f5a623";icon.textContent="⚠";msgEl.style.color="#f5a623";
   } else {
-    box.style.background="rgba(255,255,255,.03)";
-    box.style.borderColor="#252535";
-    icon.style.color="#5a5a7a"; icon.textContent="▐";
-    msgEl.style.color="#5a5a7a";
+    box.style.background="rgba(255,255,255,.03)";box.style.borderColor="#252535";
+    icon.style.color="#5a5a7a";icon.textContent="▐";msgEl.style.color="#5a5a7a";
   }
-  msgEl.textContent = msg;
+  msgEl.textContent=msg;
   if(stimer) clearTimeout(stimer);
-  if(t!=="idle") stimer = setTimeout(function(){setStatus("idle","Ready to scan");},3500);
+  if(t!=="idle") stimer=setTimeout(function(){setStatus("idle","Ready to scan");},3500);
 }
 
-var lastScanned = "";
-var lastScannedTime = 0;
+var lastScanned="", lastScannedTime=0;
 
 function doScan(val){
   if(!val||!val.trim()) return;
-  // Prevent duplicate scans within 2 seconds
-  var now = Date.now();
-  if(val === lastScanned && now - lastScannedTime < 2000) return;
-  lastScanned = val;
-  lastScannedTime = now;
+  var now=Date.now();
+  if(val===lastScanned && now-lastScannedTime<2000) return;
+  lastScanned=val; lastScannedTime=now;
 
-  var p = lookup(val);
-  var s = {
-    id: now+"",
-    branch: branch,
-    barcode: val.trim(),
-    productName: p?p.name:"Unknown Product",
-    timestamp: new Date().toISOString(),
-    found: !!p
-  };
+  var p=lookup(val);
+  var s={id:now+"",branch:branch,barcode:val.trim(),productName:p?p.name:"Unknown Product",timestamp:new Date().toISOString(),found:!!p};
 
-  scans = [s].concat(scans.slice(0,49));
+  scans=[s].concat(scans.slice(0,49));
   count++;
-  document.getElementById("scan-count").textContent = count;
+  document.getElementById("scan-count").textContent=count;
+  setStatus(p?"ok":"warn",p?p.name:"Not in master list");
 
-  setStatus(p?"ok":"warn", p?p.name:"Not in master list");
-
-  var ls = document.getElementById("last-scan");
+  var ls=document.getElementById("last-scan");
   ls.style.display="block";
-  ls.style.borderColor = p?"rgba(0,208,132,.3)":"rgba(245,166,35,.3)";
-  document.getElementById("last-product").textContent = s.productName;
-  document.getElementById("last-product").style.color = p?"#00d084":"#f5a623";
-  document.getElementById("last-barcode").textContent = s.barcode;
+  ls.style.borderColor=p?"rgba(0,208,132,.3)":"rgba(245,166,35,.3)";
+  document.getElementById("last-product").textContent=s.productName;
+  document.getElementById("last-product").style.color=p?"#00d084":"#f5a623";
+  document.getElementById("last-barcode").textContent=s.barcode;
 
   document.getElementById("recent-container").style.display="block";
-  var html = scans.map(function(sc,i){
+  document.getElementById("recent-list").innerHTML=scans.map(function(sc,i){
     return '<div class="'+(i===0?"fade":"")+'" style="padding:10px 14px;border-bottom:'+(i<scans.length-1?"1px solid #252535":"none")+';background:'+(i===0?"#1a1a26":"#12121a")+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">'
       +'<span style="font-size:12px;font-weight:600;color:'+(sc.found?"#e8e8f0":"#f5a623")+';flex:1;margin-right:8px;">'+sc.productName+'</span>'
@@ -167,20 +147,17 @@ function doScan(val){
       +'<span style="font-size:10px;color:#3a3a55;">'+new Date(sc.timestamp).toLocaleTimeString("en-GB")+'</span>'
       +'</div></div>';
   }).join("");
-  document.getElementById("recent-list").innerHTML = html;
 
   postScan(s);
 }
 
-var html5QrCode = new Html5Qrcode("qr-reader");
+var html5QrCode=new Html5Qrcode("qr-reader");
 html5QrCode.start(
   {facingMode:"environment"},
-  {fps:10, qrbox:{width:280,height:280}},
-  function(text){ doScan(text); },
+  {fps:10,qrbox:{width:280,height:280}},
+  function(text){doScan(text);},
   function(err){}
-).catch(function(e){
-  setStatus("warn","Camera error: "+e);
-});
+).catch(function(e){setStatus("warn","Camera error: "+e);});
 </script>
 </body>
 </html>
