@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8"/>
@@ -12,7 +12,6 @@ body{font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:#e8e8f0;min
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .fade{animation:fadein .25s ease;}
 #qr-reader{width:100%;max-width:400px;border-radius:16px;overflow:hidden;}
-#qr-reader video{border-radius:16px;}
 </style>
 </head>
 <body>
@@ -27,12 +26,12 @@ body{font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:#e8e8f0;min
         <rect x="17" y="0" width="2" height="16" fill="white" rx="1"/>
         <rect x="21" y="2" width="1.5" height="12" fill="white" rx="1"/>
       </svg>
-      <span style="color:#fff;font-size:13px;font-weight:800;letter-spacing:0.5px;">ROADSTER</span>
+      <span style="color:#fff;font-size:13px;font-weight:800;">ROADSTER</span>
     </div>
     <div id="branch-label" style="font-size:12px;color:#5a5a7a;font-family:monospace;"></div>
   </div>
 
-  <div id="status-box" style="border-radius:14px;background:rgba(255,255,255,.03);border:1px solid #252535;padding:12px 16px;display:flex;align-items:center;gap:12px;min-height:50px;margin-bottom:16px;transition:all .2s;">
+  <div id="status-box" style="border-radius:14px;background:rgba(255,255,255,.03);border:1px solid #252535;padding:12px 16px;display:flex;align-items:center;gap:12px;min-height:50px;margin-bottom:16px;">
     <span id="status-icon" style="font-size:18px;color:#5a5a7a;">▐</span>
     <span id="status-msg" style="font-size:14px;font-weight:600;color:#5a5a7a;">Ready to scan</span>
   </div>
@@ -41,7 +40,7 @@ body{font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:#e8e8f0;min
 
   <div id="last-scan" style="display:none;background:#1a1a26;border:1px solid #252535;border-radius:14px;padding:14px 16px;margin-bottom:16px;">
     <div style="font-size:10px;color:#5a5a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Last Scan</div>
-    <div id="last-product" style="font-size:15px;font-weight:700;color:#e8e8f0;margin-bottom:4px;"></div>
+    <div id="last-product" style="font-size:15px;font-weight:700;margin-bottom:4px;"></div>
     <div id="last-barcode" style="font-size:11px;color:#5a5a7a;font-family:monospace;"></div>
   </div>
 
@@ -52,7 +51,7 @@ body{font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:#e8e8f0;min
 
   <div style="text-align:center;margin-top:16px;">
     <span style="font-size:12px;color:#3a3a55;font-family:monospace;">Session: <strong id="scan-count" style="color:#e8e8f0;">0</strong> scans</span>
-    <div id="sync-status" style="font-size:11px;color:#3a3a55;margin-top:4px;"></div>
+    <div id="sync-status" style="font-size:11px;margin-top:4px;"></div>
   </div>
 </div>
 
@@ -65,31 +64,37 @@ if(branch) document.getElementById("branch-label").textContent = branch.toUpperC
 
 var pm = [], scans = [], count = 0, stimer = null;
 
+// Load products
 if(SCRIPT_URL) {
-  fetch(SCRIPT_URL+"?mode=products")
-    .then(function(r){return r.json();})
-    .then(function(d){pm=d||[];})
+  fetch(SCRIPT_URL + "?mode=products")
+    .then(function(r){ return r.json(); })
+    .then(function(d){ pm = d || []; })
     .catch(function(){});
 }
 
-function lookup(b){return pm.find(function(p){return p.barcode===b.trim();})||null;}
+function lookup(b){ return pm.find(function(p){ return p.barcode === b.trim(); }) || null; }
 
 function postScan(s){
   if(!SCRIPT_URL) return;
-  var form = new FormData();
-  form.append("data", JSON.stringify(s));
-  fetch(SCRIPT_URL, {
-    method: "POST",
-    mode: "no-cors",
-    body: form
-  }).then(function(){
-    document.getElementById("sync-status").textContent = "✓ Synced";
-    document.getElementById("sync-status").style.color = "#00d084";
-    setTimeout(function(){document.getElementById("sync-status").textContent="";}, 2000);
-  }).catch(function(){
-    document.getElementById("sync-status").textContent = "⚠ Sync failed";
-    document.getElementById("sync-status").style.color = "#f5a623";
-  });
+  // Send as GET request with URL parameters — works with no-cors
+  var url = SCRIPT_URL
+    + "?action=scan"
+    + "&branch=" + encodeURIComponent(s.branch)
+    + "&barcode=" + encodeURIComponent(s.barcode)
+    + "&productName=" + encodeURIComponent(s.productName)
+    + "&timestamp=" + encodeURIComponent(s.timestamp)
+    + "&found=" + encodeURIComponent(s.found);
+
+  fetch(url, { mode: "no-cors" })
+    .then(function(){
+      document.getElementById("sync-status").textContent = "✓ Synced";
+      document.getElementById("sync-status").style.color = "#00d084";
+      setTimeout(function(){ document.getElementById("sync-status").textContent = ""; }, 2000);
+    })
+    .catch(function(){
+      document.getElementById("sync-status").textContent = "⚠ Sync failed";
+      document.getElementById("sync-status").style.color = "#f5a623";
+    });
 }
 
 function setStatus(t, msg){
@@ -97,45 +102,51 @@ function setStatus(t, msg){
   var icon=document.getElementById("status-icon");
   var msgEl=document.getElementById("status-msg");
   if(t==="ok"){
-    box.style.background="rgba(0,208,132,.08)";box.style.borderColor="rgba(0,208,132,.3)";
-    icon.style.color="#00d084";icon.textContent="✓";msgEl.style.color="#00d084";
+    box.style.background="rgba(0,208,132,.08)"; box.style.borderColor="rgba(0,208,132,.3)";
+    icon.style.color="#00d084"; icon.textContent="✓"; msgEl.style.color="#00d084";
   } else if(t==="warn"){
-    box.style.background="rgba(245,166,35,.08)";box.style.borderColor="rgba(245,166,35,.3)";
-    icon.style.color="#f5a623";icon.textContent="⚠";msgEl.style.color="#f5a623";
+    box.style.background="rgba(245,166,35,.08)"; box.style.borderColor="rgba(245,166,35,.3)";
+    icon.style.color="#f5a623"; icon.textContent="⚠"; msgEl.style.color="#f5a623";
   } else {
-    box.style.background="rgba(255,255,255,.03)";box.style.borderColor="#252535";
-    icon.style.color="#5a5a7a";icon.textContent="▐";msgEl.style.color="#5a5a7a";
+    box.style.background="rgba(255,255,255,.03)"; box.style.borderColor="#252535";
+    icon.style.color="#5a5a7a"; icon.textContent="▐"; msgEl.style.color="#5a5a7a";
   }
-  msgEl.textContent=msg;
+  msgEl.textContent = msg;
   if(stimer) clearTimeout(stimer);
-  if(t!=="idle") stimer=setTimeout(function(){setStatus("idle","Ready to scan");},3500);
+  if(t !== "idle") stimer = setTimeout(function(){ setStatus("idle","Ready to scan"); }, 3500);
 }
 
-var lastScanned="", lastScannedTime=0;
+var lastScanned = "", lastScannedTime = 0;
 
 function doScan(val){
-  if(!val||!val.trim()) return;
-  var now=Date.now();
-  if(val===lastScanned && now-lastScannedTime<2000) return;
-  lastScanned=val; lastScannedTime=now;
+  if(!val || !val.trim()) return;
+  var now = Date.now();
+  if(val === lastScanned && now - lastScannedTime < 2000) return;
+  lastScanned = val; lastScannedTime = now;
 
-  var p=lookup(val);
-  var s={id:now+"",branch:branch,barcode:val.trim(),productName:p?p.name:"Unknown Product",timestamp:new Date().toISOString(),found:!!p};
+  var p = lookup(val);
+  var s = {
+    branch: branch,
+    barcode: val.trim(),
+    productName: p ? p.name : "Unknown Product",
+    timestamp: new Date().toISOString(),
+    found: !!p
+  };
 
-  scans=[s].concat(scans.slice(0,49));
+  scans = [s].concat(scans.slice(0,49));
   count++;
-  document.getElementById("scan-count").textContent=count;
-  setStatus(p?"ok":"warn",p?p.name:"Not in master list");
+  document.getElementById("scan-count").textContent = count;
+  setStatus(p ? "ok" : "warn", p ? p.name : "Not in master list");
 
-  var ls=document.getElementById("last-scan");
-  ls.style.display="block";
-  ls.style.borderColor=p?"rgba(0,208,132,.3)":"rgba(245,166,35,.3)";
-  document.getElementById("last-product").textContent=s.productName;
-  document.getElementById("last-product").style.color=p?"#00d084":"#f5a623";
-  document.getElementById("last-barcode").textContent=s.barcode;
+  var ls = document.getElementById("last-scan");
+  ls.style.display = "block";
+  ls.style.borderColor = p ? "rgba(0,208,132,.3)" : "rgba(245,166,35,.3)";
+  document.getElementById("last-product").textContent = s.productName;
+  document.getElementById("last-product").style.color = p ? "#00d084" : "#f5a623";
+  document.getElementById("last-barcode").textContent = s.barcode;
 
-  document.getElementById("recent-container").style.display="block";
-  document.getElementById("recent-list").innerHTML=scans.map(function(sc,i){
+  document.getElementById("recent-container").style.display = "block";
+  document.getElementById("recent-list").innerHTML = scans.map(function(sc,i){
     return '<div class="'+(i===0?"fade":"")+'" style="padding:10px 14px;border-bottom:'+(i<scans.length-1?"1px solid #252535":"none")+';background:'+(i===0?"#1a1a26":"#12121a")+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">'
       +'<span style="font-size:12px;font-weight:600;color:'+(sc.found?"#e8e8f0":"#f5a623")+';flex:1;margin-right:8px;">'+sc.productName+'</span>'
@@ -151,13 +162,13 @@ function doScan(val){
   postScan(s);
 }
 
-var html5QrCode=new Html5Qrcode("qr-reader");
+var html5QrCode = new Html5Qrcode("qr-reader");
 html5QrCode.start(
   {facingMode:"environment"},
-  {fps:10,qrbox:{width:280,height:280}},
-  function(text){doScan(text);},
+  {fps:10, qrbox:{width:280,height:280}},
+  function(text){ doScan(text); },
   function(err){}
-).catch(function(e){setStatus("warn","Camera error: "+e);});
+).catch(function(e){ setStatus("warn","Camera error: "+e); });
 </script>
 </body>
 </html>
