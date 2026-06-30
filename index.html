@@ -139,8 +139,8 @@ function setStatus(t, msg){
 
 function startCooldown(){
   scanning = false;
-  // Pause camera
-  try { html5QrCode.pause(); } catch(e){}
+  // Pause camera (true = also pause the video element, stronger stop)
+  try { html5QrCode.pause(true); } catch(e){}
 
   // Animate cooldown bar
   var bar = document.getElementById("cooldown-bar");
@@ -153,6 +153,7 @@ function startCooldown(){
 
   setTimeout(function(){
     scanning = true;
+    isProcessing = false;
     bar.classList.remove("active");
     bar.style.width = "0%";
     setStatus("idle", "Ready to scan");
@@ -161,9 +162,12 @@ function startCooldown(){
   }, 2000);
 }
 
+var isProcessing = false; // hard lock against rapid re-triggers
+
 function doScan(val){
   if(!val || !val.trim()) return;
-  if(!scanning) return; // in cooldown
+  if(!scanning || isProcessing) return; // in cooldown or already handling a scan
+  isProcessing = true;
 
   var p = lookup(val);
   var s = {
