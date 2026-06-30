@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -189,27 +188,26 @@ function setStatus(t, msg){
 
 function startCooldown(){
   scanning = false;
-  // Pause camera (true = also pause the video element, stronger stop)
-  try { html5QrCode.pause(true); } catch(e){}
 
-  // Animate cooldown bar
   var bar = document.getElementById("cooldown-bar");
   bar.style.width = "100%";
   bar.style.animation = "none";
   bar.offsetHeight; // reflow
   bar.classList.add("active");
 
-  setStatus("cooldown", "Next scan in 4s...");
+  setStatus("cooldown", "Move camera away to scan again");
 
-  setTimeout(function(){
-    scanning = true;
-    isProcessing = false;
-    bar.classList.remove("active");
-    bar.style.width = "0%";
-    setStatus("idle", "Ready to scan");
-    // Resume camera
-    try { html5QrCode.resume(); } catch(e){}
-  }, 4000);
+  // No fixed timer here — re-enabling happens in the "gone" watcher below,
+  // once the camera stops seeing ANY code for GONE_MS straight.
+}
+
+function endCooldown(){
+  scanning = true;
+  isProcessing = false;
+  var bar = document.getElementById("cooldown-bar");
+  bar.classList.remove("active");
+  bar.style.width = "0%";
+  setStatus("idle", "Ready to scan");
 }
 
 var isProcessing = false; // hard lock against rapid re-triggers
@@ -259,32 +257,41 @@ function doScan(val){
   }).join("");
 
   postScan(s);
-  startCooldown(); // pause for 2s after each scan
+  startCooldown(); // lock until the camera no longer sees any code
 }
 
 var html5QrCode = null;
-var lastAcceptedTime = 0;
-var COOLDOWN_MS = 4000;
+var lastSeenTime = 0;   // last time ANY code was detected in the frame
+var GONE_MS = 800;      // how long with zero detections counts as "code removed"
+var watcherInterval = null;
 
 function initCamera(){
   if(html5QrCode) return; // already started
   html5QrCode = new Html5Qrcode("qr-reader");
   html5QrCode.start(
     {facingMode:"environment"},
-    {fps:5, qrbox:{width:280,height:280}},
+    {fps:8, qrbox:{width:280,height:280}},
     function(text){
-      // Hard time-based debounce — ignore ANY detection within COOLDOWN_MS
-      // of the last accepted scan, regardless of pause/resume state.
-      var now = Date.now();
-      if (now - lastAcceptedTime < COOLDOWN_MS) return;
-      lastAcceptedTime = now;
-      doScan(text);
+      lastSeenTime = Date.now();
+      doScan(text); // no-ops internally if scanning is locked
     },
     function(err){}
   ).catch(function(e){ setStatus("warn","Camera error: "+e); });
+
+  // Watcher: while locked, wait until we've had a stretch of GONE_MS
+  // with no detections at all — meaning the code left the frame —
+  // before re-enabling scanning.
+  watcherInterval = setInterval(function(){
+    if(scanning) return; // not locked, nothing to do
+    var sinceLastSeen = Date.now() - lastSeenTime;
+    if(sinceLastSeen >= GONE_MS){
+      endCooldown();
+    }
+  }, 150);
 }
 
 if(branch) initCamera();
 </script>
 </body>
 </html>
+
