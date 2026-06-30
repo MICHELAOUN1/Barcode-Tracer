@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8"/>
@@ -13,7 +14,7 @@ body{font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:#e8e8f0;min
 .fade{animation:fadein .25s ease;}
 #qr-reader{width:100%;max-width:400px;border-radius:16px;overflow:hidden;}
 #cooldown-bar{height:3px;background:#8B1C2C;border-radius:2px;width:0%;transition:none;}
-#cooldown-bar.active{animation:cooldown 2s linear forwards;}
+#cooldown-bar.active{animation:cooldown 4s linear forwards;}
 </style>
 </head>
 <body>
@@ -197,7 +198,7 @@ function startCooldown(){
   bar.offsetHeight; // reflow
   bar.classList.add("active");
 
-  setStatus("cooldown", "Next scan in 2s...");
+  setStatus("cooldown", "Next scan in 4s...");
 
   setTimeout(function(){
     scanning = true;
@@ -207,7 +208,7 @@ function startCooldown(){
     setStatus("idle", "Ready to scan");
     // Resume camera
     try { html5QrCode.resume(); } catch(e){}
-  }, 2000);
+  }, 4000);
 }
 
 var isProcessing = false; // hard lock against rapid re-triggers
@@ -261,14 +262,23 @@ function doScan(val){
 }
 
 var html5QrCode = null;
+var lastAcceptedTime = 0;
+var COOLDOWN_MS = 4000;
 
 function initCamera(){
   if(html5QrCode) return; // already started
   html5QrCode = new Html5Qrcode("qr-reader");
   html5QrCode.start(
     {facingMode:"environment"},
-    {fps:10, qrbox:{width:280,height:280}},
-    function(text){ doScan(text); },
+    {fps:5, qrbox:{width:280,height:280}},
+    function(text){
+      // Hard time-based debounce — ignore ANY detection within COOLDOWN_MS
+      // of the last accepted scan, regardless of pause/resume state.
+      var now = Date.now();
+      if (now - lastAcceptedTime < COOLDOWN_MS) return;
+      lastAcceptedTime = now;
+      doScan(text);
+    },
     function(err){}
   ).catch(function(e){ setStatus("warn","Camera error: "+e); });
 }
