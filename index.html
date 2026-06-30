@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8"/>
@@ -18,7 +17,28 @@ body{font-family:Inter,system-ui,sans-serif;background:#0a0a0f;color:#e8e8f0;min
 </style>
 </head>
 <body>
-<div style="width:100%;max-width:440px;">
+
+<!-- Branch Selection Screen -->
+<div id="branch-select" style="width:100%;max-width:380px;display:none;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <div style="background:#8B1C2C;border-radius:10px;padding:8px 14px;display:inline-flex;align-items:center;gap:8px;margin-bottom:16px;">
+      <svg width="24" height="16" viewBox="0 0 24 16" fill="none">
+        <rect x="2" y="0" width="2" height="16" fill="white" rx="1"/>
+        <rect x="6" y="2" width="1.5" height="12" fill="white" rx="1"/>
+        <rect x="9" y="0" width="3" height="16" fill="white" rx="1"/>
+        <rect x="14" y="2" width="1.5" height="12" fill="white" rx="1"/>
+        <rect x="17" y="0" width="2" height="16" fill="white" rx="1"/>
+        <rect x="21" y="2" width="1.5" height="12" fill="white" rx="1"/>
+      </svg>
+      <span style="color:#fff;font-size:13px;font-weight:800;">ROADSTER</span>
+    </div>
+    <h1 style="font-size:18px;font-weight:700;color:#e8e8f0;margin-bottom:4px;">Select Branch</h1>
+    <p style="color:#5a5a7a;font-size:12px;">Choose your branch to start scanning</p>
+  </div>
+  <div id="branch-list" style="display:flex;flex-direction:column;gap:7px;"></div>
+</div>
+
+<div id="scanner-screen" style="width:100%;max-width:440px;display:none;">
 
   <div style="text-align:center;margin-bottom:20px;">
     <div style="background:#8B1C2C;border-radius:10px;padding:8px 14px;display:inline-flex;align-items:center;gap:8px;margin-bottom:12px;">
@@ -73,7 +93,35 @@ var params = new URLSearchParams(window.location.search);
 var SCRIPT_URL = params.get("url") || "";
 var branch = params.get("branch") || "";
 
-if(branch) document.getElementById("branch-label").textContent = branch.toUpperCase();
+var BRANCHES = ["Roadster - Achrafieh","Roadster - Hamra","Roadster - Dbayeh","Roadster - Verdun","Roadster - ABC Ashrafieh","Roadster - City Mall","Roadster - Kaslik","Roadster - Jounieh","Deek Duke - Hamra","Deek Duke - Dbayeh","Bar Tartine - Gemmayzeh"];
+
+function showBranchSelect(){
+  document.getElementById("scanner-screen").style.display = "none";
+  document.getElementById("branch-select").style.display = "block";
+  var list = document.getElementById("branch-list");
+  list.innerHTML = BRANCHES.map(function(b){
+    return '<button onclick="chooseBranch(\''+b.replace(/'/g,"\\'")+'\')" style="background:#1a1a26;border:1px solid #252535;border-left:3px solid #8B1C2C;border-radius:10px;padding:12px 14px;color:#e8e8f0;text-align:left;width:100%;cursor:pointer;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;">'
+      +'<div style="width:7px;height:7px;border-radius:50%;background:#8B1C2C;flex-shrink:0;"></div>'+b+'</button>';
+  }).join("");
+}
+
+function chooseBranch(b){
+  branch = b;
+  var url = new URL(window.location.href);
+  url.searchParams.set("branch", b);
+  window.history.replaceState({}, "", url);
+  document.getElementById("branch-select").style.display = "none";
+  document.getElementById("scanner-screen").style.display = "block";
+  document.getElementById("branch-label").textContent = branch.toUpperCase();
+  initCamera();
+}
+
+if(branch){
+  document.getElementById("scanner-screen").style.display = "block";
+  document.getElementById("branch-label").textContent = branch.toUpperCase();
+} else {
+  showBranchSelect();
+}
 
 var pm = [], scans = [], count = 0, stimer = null;
 var scanning = true; // cooldown flag
@@ -212,13 +260,20 @@ function doScan(val){
   startCooldown(); // pause for 2s after each scan
 }
 
-var html5QrCode = new Html5Qrcode("qr-reader");
-html5QrCode.start(
-  {facingMode:"environment"},
-  {fps:10, qrbox:{width:280,height:280}},
-  function(text){ doScan(text); },
-  function(err){}
-).catch(function(e){ setStatus("warn","Camera error: "+e); });
+var html5QrCode = null;
+
+function initCamera(){
+  if(html5QrCode) return; // already started
+  html5QrCode = new Html5Qrcode("qr-reader");
+  html5QrCode.start(
+    {facingMode:"environment"},
+    {fps:10, qrbox:{width:280,height:280}},
+    function(text){ doScan(text); },
+    function(err){}
+  ).catch(function(e){ setStatus("warn","Camera error: "+e); });
+}
+
+if(branch) initCamera();
 </script>
 </body>
 </html>
